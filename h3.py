@@ -4,76 +4,19 @@ import matplotlib.pyplot as plt
 import operator
 import copy
 
-def generate_2d_gaussian(N, meanX, meanY, var):
+def generateGaussian2D(N, meanX, meanY, var):
     x = np.random.normal(loc=meanX, scale=var, size=N)
     y = np.random.normal(loc=meanY, scale=var, size=N)
     return x, y
 
-def generate_data():
-    x0, y0 = generate_2d_gaussian(300, 0, 0, 1.5)
-    x1, y1 = generate_2d_gaussian(200, 7, 2, 1)
-    x2, y2 = generate_2d_gaussian(200, 3, 5, 1.5)
+
+def generateData():
+    x0, y0 = generateGaussian2D(300, 0, 0, 1.5)
+    x1, y1 = generateGaussian2D(200, 7, 2, 1)
+    x2, y2 = generateGaussian2D(200, 3, 5, 1.5)
     data = np.dstack((np.concatenate((x0, x1, x2)), np.concatenate((y0, y1, y2))))[0]
     return data
 
-def initialize_params(pts, K):
-    N = len(pts)
-    dim = len(pts[0])
-    ci = np.random.randint(N, size=K)
-
-    miu = pts[ci]
-    pi = np.zeros((K,))
-    sigma = np.zeros((K, dim, dim))
-
-    dist = np.tile(np.sum(pts * pts, 1), (K, 1)).transpose() + \
-        np.tile(np.sum(miu * miu, 1), (N, 1)) - \
-        2 * pts.dot(miu.transpose())
-    m = np.argmin(dist, axis=1)
-
-    for k in range(K):
-        pk = pts[np.where(m == k)]
-        pi[k] = len(pk) / N
-        sigma[k] = np.cov(pk.transpose())
-
-    return miu, pi, sigma
-
-def estimate(pts, K, miu, pi, sigma):
-    N = len(pts)
-    D = len(pts[0])
-    prob = np.zeros((N, K))
-    for k in range(K):
-        xs = pts - np.tile(miu[k], (N, 1))
-        isig = np.linalg.inv(sigma[k])
-        t = np.sum(xs.dot(isig) * xs, 1)
-        coef = np.power(2 * math.pi, -D / 2) * np.sqrt(np.linalg.det(isig))
-        prob[:, k] = coef * np.exp(-0.5 * t)
-    return prob
-
-def gmm(pts, K):
-    N = len(pts)
-    D = len(pts[0])
-    miu, pi, sigma = initialize_params(pts, K)
-    Lprev = -999999
-    it = 1
-    while True:
-        prob = estimate(pts, K, miu, pi, sigma) # n by k
-        gamma = prob * np.tile(pi, (N, 1))
-        gamma = gamma / np.tile(np.sum(gamma, 1), (K, 1)).transpose() # n by k
-        Nk = np.sum(gamma, 0) # 1 by k
-
-        miu = np.diag(1 / Nk).dot(gamma.transpose()).dot(pts) # k by d
-        pi = Nk / N
-
-        for k in range(K):
-            xs = pts - np.tile(miu[k], (N, 1))
-            sigma[k] = (xs.transpose().dot(np.diag(gamma[:, k]).dot(xs))) / Nk[k]
-
-        L = np.sum(np.log(prob.dot(pi.transpose())))
-        print('Iteration %d: %f' % (it, L - Lprev))
-        it += 1
-        if L - Lprev < 1e-15: break
-        Lprev = L
-    return np.argmax(prob, axis=1)
 
 class Pt():
     def __init__(self, id, d, N):
@@ -123,6 +66,7 @@ def mean_shift(pts, bandWidth=2, eps=1e-6):
     centers = []
     
     for initialPt in pts:
+        print(initialPt.id, '/ %d' % len(pts))
         pt = copy.deepcopy(initialPt)
         while True:
             shift = pt.shiftSearch(pt.id, pts)
@@ -146,16 +90,12 @@ def mean_shift(pts, bandWidth=2, eps=1e-6):
 
 
 def main():
-    cluster_markers = ['rx', 'gx', 'bx', 'kx', 'kx', 'kx', 'kx', 'kx']
-    data = generate_data()
+    cluster_markers = ['bx', 'gx', 'rx', 'cx', 'mx', 'yx', 'kx', 'wx']
+    data = generateData()
     pts = generate_pts(data)
     cluster = mean_shift(pts)
-
-
-    # cr = gmm(np.dstack((x, y))[0], len(Clusters))
     for i, d in enumerate(data):
         plt.plot(d[0], d[1], cluster_markers[cluster[i]])
-    #plt.plot(x, y, 'rx')
     plt.show()
 
 if __name__ == '__main__':
